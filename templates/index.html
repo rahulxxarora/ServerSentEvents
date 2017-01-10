@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+</head>
+<body>
+	<script>
+	var source = new EventSource("{{ url_for('sse.stream', channel=request.args.get('channel', 'series_broadcast')) }}");
+	
+	// Listener for new series added
+
+	source.addEventListener('new_series_added', function(e) {
+		var data = JSON.parse(e.data);
+		var div = document.getElementById('series');
+		div.innerHTML = div.innerHTML + "<li>" + data.message + "</li>";
+	}, false);
+		
+	// This function sends AJAX request to server with user entered text
+
+	function subscribe(eventname) {
+		json_obj = {'series_name':eventname};
+
+		$.ajax({
+			dataType: "json",
+			type: "POST",
+			contentType: "application/json",
+			url: "/check_existence",
+			data: JSON.stringify(json_obj),
+			success: function(response) {
+				document.getElementById('inputbox').value = "";
+				var result = response['message'];
+
+				// User entered series exists
+				if (result.localeCompare('Success')==0) {
+					console.log("Listener added : " + eventname);
+
+					source.addEventListener(eventname, function(e) {
+					var data = JSON.parse(e.data);
+					document.body.innerHTML += "New update from " + eventname + " : " + data.message + "</br>";
+					document.getElementById('inputbox').value = "";
+					}, false);
+				} 
+				// User entered series doesn't exist
+				else {
+					alert("Doesn't exist!");
+				}
+			},
+			error: function(response) {
+				console.log(response);
+			}
+		});
+	}
+
+	</script>
+
+	<h1> Available Subscriptions </h1>
+	
+	<div id="series">
+		{% for series_name in available_series %}
+			<li>{{series_name}}</li>
+		{% endfor %}
+	</div>
+	
+	<hr><br><br>
+
+	<input name="inputbox" id="inputbox" type="text" />
+	<button onclick="subscribe(document.getElementById('inputbox').value)" >Add</button>
+	<br><br>
+</body>
+</html>
